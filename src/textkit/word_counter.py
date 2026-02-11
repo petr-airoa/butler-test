@@ -9,8 +9,10 @@ def _normalize_words(text: str) -> list[str]:
     return re.findall(r"[a-zA-Z']+", text.lower())
 
 
-def count_words(text: str, ignore_short: int = 0) -> int:
-    """Return the total number of words, optionally ignoring short words."""
+def count_words(text: str, ignore_short: int = 0, strip_punctuation: bool = False) -> int:
+    """Return the total number of words, with optional filtering."""
+    if strip_punctuation:
+        text = re.sub(r"[^\w\s]", "", text)
     words = _normalize_words(text)
     if ignore_short > 0:
         words = [w for w in words if len(w) > ignore_short]

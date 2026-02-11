@@ -142,6 +142,90 @@ Updated the import in `text_stats.py` on branch 2 (`count_unique_words` → `uni
 
 ---
 
+## Phase 7: Provoking a Git-Level Merge Conflict
+
+### Goal
+
+Phase 6 showed that a function rename in branch 1 causes only a **semantic** conflict — git rebases silently. This phase attempts a **real git-level add/add conflict** by creating `src/textkit/text_stats.py` on branch 1, which already exists on branch 2.
+
+### Setup
+
+Created a partial, different version of `text_stats.py` on branch 1 (`feature-word-counter`) — same file path as branch 2's version but with:
+- Different module docstring
+- Different import style (inline `import re` instead of top-level)
+- Only 2 of branch 2's 5 functions (`sentence_count`, `average_word_length`)
+- Different docstrings for the shared functions
+
+### Actions
+
+1. Wrote the conflicting `text_stats.py` on disk
+2. `but stage src/textkit/text_stats.py feature-word-counter` — staged to branch 1
+3. `but commit feature-word-counter -m "Add preliminary text stats helpers"` — committed
+4. `but push` — pushed (silent success)
+5. `but status -r` — checked for conflicts
+
+### What Actually Happened: No Git Conflict
+
+**Surprise: GitButler did NOT report a git-level merge conflict.** Despite both branches creating the same file, all commits showed `"conflicted": false` in JSON status.
+
+Instead, GitButler's behavior was:
+
+1. **Rebased branch 2 on top of updated branch 1** — the rebase succeeded because GitButler treats branch 2's commits as modifications to a file that now exists in the base (branch 1).
+2. **Working tree showed branch 1's version** — after rebase, the on-disk file was branch 1's partial `text_stats.py` (2 functions).
+3. **Surfaced the diff as "staged changes"** — the difference between branch 1's version (now the base) and branch 2's version appeared in a `[staged to feature-text-stats]` area, with the file locked to the relevant branch 2 commits:
+   ```
+   ╭┄i0 [staged to feature-text-stats]
+   │ g0 M src/textkit/text_stats.py 🔒 a93cdc8, d31f10d
+   ```
+4. **Tests failed** — `ImportError: cannot import name 'reading_difficulty'` because the working tree had branch 1's partial version.
+
+### Resolution
+
+Restored branch 2's full `text_stats.py` to disk. Since this matched what the rebased commits expected, the diff vanished and the workspace became clean — no additional commit was needed.
+
+- All 12 tests passed
+- `but status -r` showed all `●` (up to date)
+
+### Key Finding: GitButler's "Silent Merge" for Add/Add Conflicts
+
+GitButler handles add/add conflicts **differently than vanilla git**:
+
+| Scenario | Vanilla Git | GitButler |
+|---|---|---|
+| Both branches create same file | `CONFLICT (add/add)` — merge stops, conflict markers in file | Rebase succeeds silently |
+| Conflict reporting | Explicit merge conflict state | Shows diff as "staged changes" to dependent branch |
+| Working tree | Contains `<<<<<<<` markers | Contains base branch's version (clean, no markers) |
+| Resolution | Manual edit + `git add` + `git commit` | Restore desired version on disk; diff disappears if it matches rebase result |
+| `but resolve` needed? | N/A | No — `but resolve` was available but not triggered because commits weren't flagged as conflicted |
+
+### Why No Conflict Was Detected
+
+GitButler's virtual branch system treats the stack differently than `git rebase`:
+- Branch 1's `text_stats.py` becomes part of the **base tree** for branch 2
+- Branch 2's commits that create `text_stats.py` are reinterpreted as **modifications** to the already-existing file
+- Since the rebase can apply branch 2's changes as patches on top of branch 1's version, there's no conflict from git's perspective
+
+The result is correct in the commit history but the working tree temporarily shows the wrong version until the user resolves the discrepancy.
+
+### Contrast with Phase 6 (Semantic Conflict)
+
+| Aspect | Phase 6 (Rename) | Phase 7 (Add/Add) |
+|---|---|---|
+| Conflict type | Semantic (broken import) | File overlap (same path, different content) |
+| Git detects it? | No | No (in GitButler's rebase model) |
+| Working tree broken? | Yes (ImportError) | Yes (ImportError — missing functions) |
+| How surfaced | Not at all — must run tests | Diff appears in "staged changes" area |
+| Resolution | Edit import in branch 2, new commit | Restore full version on disk, no commit needed |
+
+### Implications
+
+1. **GitButler absorbs add/add conflicts** into its staged changes mechanism rather than halting with conflict markers. This is smoother but can be confusing — the working tree is subtly wrong.
+2. **The `🔒` lock annotation** on staged files helps identify which commits are affected.
+3. **`but resolve` exists but wasn't needed** — it's for commits explicitly marked as conflicted, which didn't happen here.
+4. **Tests remain the ultimate safety net** — whether the conflict is semantic or textual, only running the test suite catches the breakage.
+
+---
+
 ## GitButler CLI Command Reference (as used)
 
 | Command | Purpose |
@@ -162,6 +246,10 @@ Updated the import in `text_stats.py` on branch 2 (`count_unique_words` → `uni
 | `but show <branch>` | Show branch details and commits |
 | `but config forge auth` | Authenticate with GitHub/GitLab |
 | `but integrate upstream` | (Does not exist — use `but pull`) |
+| `but resolve <commit>` | Enter conflict resolution mode for a conflicted commit |
+| `but resolve status` | Show remaining conflicted files during resolution |
+| `but resolve finish` | Finalize conflict resolution |
+| `but resolve cancel` | Cancel conflict resolution |
 
 ## Status Symbols
 
@@ -181,3 +269,5 @@ Updated the import in `text_stats.py` on branch 2 (`count_unique_words` → `uni
 4. **Semantic conflicts are the real danger**: Git-level merge conflicts are rare in stacks (branches usually touch different files). The real risk is broken imports, changed APIs, and behavioral changes that pass rebase but fail tests.
 5. **Push triggers rebase**: When you push a base branch with new commits, GitButler rebases dependent branches automatically.
 6. **The CLI is database-backed**: Operations can fail with lock errors during background syncs. Brief retries resolve this.
+7. **Add/add conflicts are absorbed, not flagged**: When two stacked branches create the same file, GitButler rebases silently and surfaces the diff as "staged changes" rather than stopping with conflict markers. The working tree is temporarily wrong but `but resolve` is not triggered.
+8. **Tests are the only reliable conflict detector**: Both semantic conflicts (Phase 6) and file-overlap conflicts (Phase 7) pass through GitButler's rebase without explicit conflict flags. Only running the test suite catches the breakage.

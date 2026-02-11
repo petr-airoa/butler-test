@@ -3,6 +3,7 @@ from textkit.text_stats import (
     reading_difficulty,
     sentence_count,
     text_summary,
+    vocabulary_richness,
 )
 
 
@@ -33,5 +34,12 @@ def test_text_summary():
     assert summary["sentence_count"] == 2
     assert isinstance(summary["average_word_length"], float)
     assert summary["reading_difficulty"] in ("easy", "moderate", "hard")
+    assert isinstance(summary["vocabulary_richness"], float)
     assert isinstance(summary["word_frequencies"], dict)
     assert isinstance(summary["top_words"], list)
+
+
+def test_vocabulary_richness():
+    assert vocabulary_richness("the the the") == 1 / 3
+    assert vocabulary_richness("a b c d") == 1.0
+    assert vocabulary_richness("") == 0.0

@@ -3,7 +3,7 @@
 import re
 
 from textkit.word_counter import (
-    count_unique_words,
+    unique_word_count,
     count_words,
     most_common_words,
     word_frequencies,
@@ -48,7 +48,7 @@ def vocabulary_richness(text: str) -> float:
     total = count_words(text)
     if total == 0:
         return 0.0
-    return count_unique_words(text) / total
+    return unique_word_count(text) / total
 
 
 def text_summary(text: str) -> dict:

@@ -1,5 +1,6 @@
 from textkit.word_counter import (
     _normalize_words,
+    count_unique_words,
     count_words,
     most_common_words,
     word_frequencies,
@@ -36,3 +37,9 @@ def test_most_common_words_default_n():
     text = "a b c d e f g"
     result = most_common_words(text)
     assert len(result) == 5
+
+
+def test_count_unique_words():
+    assert count_unique_words("the cat sat on the mat") == 5
+    assert count_unique_words("hello hello hello") == 1
+    assert count_unique_words("") == 0

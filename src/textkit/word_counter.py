@@ -22,3 +22,8 @@ def word_frequencies(text: str) -> dict[str, int]:
 def most_common_words(text: str, n: int = 5) -> list[tuple[str, int]]:
     """Return the top N most common words as (word, count) pairs."""
     return Counter(_normalize_words(text)).most_common(n)
+
+
+def count_unique_words(text: str) -> int:
+    """Return the number of distinct words in text."""
+    return len(set(_normalize_words(text)))

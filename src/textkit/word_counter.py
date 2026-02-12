@@ -9,9 +9,12 @@ def _normalize_words(text: str) -> list[str]:
     return re.findall(r"[a-zA-Z']+", text.lower())
 
 
-def count_words(text: str) -> int:
-    """Return the total number of words in text."""
-    return len(_normalize_words(text))
+def count_words(text: str, ignore_short: int = 0) -> int:
+    """Return the total number of words, optionally ignoring short words."""
+    words = _normalize_words(text)
+    if ignore_short > 0:
+        words = [w for w in words if len(w) > ignore_short]
+    return len(words)
 
 
 def word_frequencies(text: str) -> dict[str, int]:
